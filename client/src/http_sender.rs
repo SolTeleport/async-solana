@@ -26,7 +26,7 @@ use {
 };
 
 pub struct HttpSender {
-    client: Arc<reqwest::blocking::Client>,
+    client: Arc<reqwest::Client>,
     url: String,
     request_id: AtomicU64,
     stats: RwLock<RpcTransportStats>,
