@@ -158,7 +158,7 @@ impl RpcSender for HttpSender {
                 return Err(response.error_for_status().unwrap_err().into());
             }
 
-            let mut json = response.json::<serde_json::Value>()?;
+            let mut json = response.json::<serde_json::Value>().await?;
             if json["error"].is_object() {
                 return match serde_json::from_value::<RpcErrorObject>(json["error"].clone()) {
                     Ok(rpc_error_object) => {
