@@ -8,6 +8,7 @@ use {
         rpc_response::RpcSimulateTransactionResult,
         rpc_sender::*,
     },
+    async_trait::async_trait,
     log::*,
     reqwest::{
         self,
@@ -48,12 +49,10 @@ impl HttpSender {
         // `reqwest::blocking::Client` panics if run in a tokio async context.  Shuttle the
         // request to a different tokio thread to avoid this
         let client = Arc::new(
-            tokio::task::block_in_place(move || {
-                reqwest::blocking::Client::builder()
-                    .timeout(timeout)
-                    .build()
-            })
-            .expect("build rpc client"),
+            reqwest::Client::builder()
+                .timeout(timeout)
+                .build()
+                .expect("build rpc client"),
         );
 
         Self {
@@ -100,12 +99,17 @@ impl<'a> Drop for StatsUpdater<'a> {
     }
 }
 
+#[async_trait]
 impl RpcSender for HttpSender {
     fn get_transport_stats(&self) -> RpcTransportStats {
         self.stats.read().unwrap().clone()
     }
 
-    fn send(&self, request: RpcRequest, params: serde_json::Value) -> Result<serde_json::Value> {
+    async fn send(
+        &self,
+        request: RpcRequest,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         let mut stats_updater = StatsUpdater::new(&self.stats);
 
         let request_id = self.request_id.fetch_add(1, Ordering::Relaxed);
@@ -118,13 +122,11 @@ impl RpcSender for HttpSender {
             let response = {
                 let client = self.client.clone();
                 let request_json = request_json.clone();
-                tokio::task::block_in_place(move || {
-                    client
-                        .post(&self.url)
-                        .header(CONTENT_TYPE, "application/json")
-                        .body(request_json)
-                        .send()
-                })
+                client
+                    .post(&self.url)
+                    .header(CONTENT_TYPE, "application/json")
+                    .body(request_json)
+                    .send()
             }?;
 
             if !response.status().is_success() {
@@ -148,15 +150,14 @@ impl RpcSender for HttpSender {
                                 response, too_many_requests_retries, duration
                             );
 
-                    sleep(duration);
+                    tokio::time::sleep(duration);
                     stats_updater.add_rate_limited_time(duration);
                     continue;
                 }
                 return Err(response.error_for_status().unwrap_err().into());
             }
 
-            let mut json =
-                tokio::task::block_in_place(move || response.json::<serde_json::Value>())?;
+            let mut json = response.json::<serde_json::Value>()?;
             if json["error"].is_object() {
                 return match serde_json::from_value::<RpcErrorObject>(json["error"].clone()) {
                     Ok(rpc_error_object) => {
