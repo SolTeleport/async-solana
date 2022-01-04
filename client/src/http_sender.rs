@@ -127,6 +127,7 @@ impl RpcSender for HttpSender {
                     .header(CONTENT_TYPE, "application/json")
                     .body(request_json)
                     .send()
+                    .await
             }?;
 
             if !response.status().is_success() {

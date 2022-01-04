@@ -29,7 +29,12 @@ pub struct RpcTransportStats {
 /// [`RpcClient`]: crate::rpc_client::RpcClient
 /// [`HttpSender`]: crate::http_sender::HttpSender
 /// [`MockSender`]: crate::mock_sender::MockSender
+#[async_trait]
 pub trait RpcSender {
-    fn send(&self, request: RpcRequest, params: serde_json::Value) -> Result<serde_json::Value>;
+    async fn send(
+        &self,
+        request: RpcRequest,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value>;
     fn get_transport_stats(&self) -> RpcTransportStats;
 }
