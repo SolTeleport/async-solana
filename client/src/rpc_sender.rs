@@ -2,6 +2,7 @@
 
 use {
     crate::{client_error::Result, rpc_request::RpcRequest},
+    async_trait::async_trait,
     std::time::Duration,
 };
 
